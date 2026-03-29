@@ -1,0 +1,23 @@
+name: Health Check
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Extract domain
+        id: domain
+        run: |
+          DOMAIN=$(grep 'pattern' wrangler.toml | head -1 | grep -oP '[\w.-]+\.\w+(?=/\*)' || echo "")
+          echo "domain=$DOMAIN" >> $GITHUB_OUTPUT
+      - name: Health check
+        run: |
+          DOMAIN="${{ steps.domain.outputs.domain }}"
+          if [ -z "$DOMAIN" ]; then echo "No domain found"; exit 0; fi
+          CODE=$(curl -sL -o /dev/null -w "%{http_code}" --max-time 10 "https://$DOMAIN")
+          echo "$DOMAIN: HTTP $CODE"
+          if [ "$CODE" != "200" ]; then echo "UNHEALTHY"; exit 1; fi
